@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "tasks")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class taskEntity {
+public class TaskEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,4 +32,6 @@ public class taskEntity {
 
     @UpdateTimestamp
     LocalDateTime updatedAt;
+
+    private Long projectId;
 }
