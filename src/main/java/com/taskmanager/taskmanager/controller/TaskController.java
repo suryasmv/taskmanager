@@ -36,12 +36,12 @@ public class TaskController {
     }
 
     @DeleteMapping("/tasks/{id}")
-    public void deleteTask(@PathVariable Long id) {
-        taskService.deleteTaskById(id);
+    public void deleteTask(@PathVariable Long id, @RequestParam(required = false) Integer maxPriority) {
+        taskService.deleteTaskById(id, maxPriority);
     }
 
     @PostMapping("/tasks/reorder")
     public void reorderTasks(@RequestBody TaskReorderRequest request) {
-        taskService.reorderTasks(request);
+        taskService.reorderTasks(request, request.getMaxPriority());
     }
 }

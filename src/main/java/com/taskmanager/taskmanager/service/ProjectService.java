@@ -101,28 +101,48 @@ public class ProjectService {
         return task;
     }
 
-    // 6) Reorder tasks inside project
     @Transactional
-    public void reorderTasksInProject(String projectName, TaskReorderRequest request) {
+    public void deleteTaskInProject(String projectName, Long taskId, Integer maxPriority) {
+
+        // 1) Delete the task
+        taskRepository.deleteById(taskId);
+
+        // 2) Fetch the project
         ProjectEntity project = projectRepository.findByName(projectName)
                 .orElseThrow(() -> new ProjectNotFoundException(projectName));
 
         Long projectId = project.getId();
-        int priority = 1;
 
+        List<TaskEntity> tasks =
+                taskRepository.findAllByProjectIdOrderByPriorityAsc(projectId);
+
+        // 4) Build reorder request
+        TaskReorderRequest request = new TaskReorderRequest();
+        request.setOrderedIds(
+                tasks.stream().map(TaskEntity::getId).toList()
+        );
+
+        // 5) Reorder using existing method
+        reorderTasksInProject(projectName, request, maxPriority);
+    }
+
+    // 6) Reorder tasks inside project
+    @Transactional
+    public void reorderTasksInProject(String projectName, TaskReorderRequest request, Integer maxPriority) {
+        if (maxPriority != null) {
+            taskService.setMaxPriority(projectName, maxPriority);
+        }
+        int limit = taskService.getMaxPriority(projectName);
+
+        int pos = 1;
         for (Long taskId : request.getOrderedIds()) {
-            TaskEntity task = taskRepository.findById(taskId).orElseThrow();
-
-            if (!projectId.equals(task.getProjectId())) {
-                throw new IllegalArgumentException("Task " + taskId + " does not belong to project " + projectName);
-            }
-
-            if (priority <= 3) {
-                task.setPriority(priority);
-            } else {
-                task.setPriority(null);
-            }
-            priority++;
+            TaskEntity task = taskRepository.findById(taskId)
+                    .orElseThrow(() -> new TaskNotFoundException("Task not found: " + taskId));
+            // validate project id as before
+            task.setPosition(pos);
+            task.setPriority(pos <= limit ? pos : null);
+            taskRepository.save(task);
+            pos++;
         }
     }
 }

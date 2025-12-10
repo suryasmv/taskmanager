@@ -4,12 +4,13 @@ import com.taskmanager.taskmanager.dto.TaskReorderRequest;
 import com.taskmanager.taskmanager.entity.TaskEntity;
 import com.taskmanager.taskmanager.exception.TaskNotFoundException;
 import com.taskmanager.taskmanager.repository.TaskRepository;
-import com.taskmanager.taskmanager.repository.ProjectRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -17,24 +18,35 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
 
+    private final Map<String, Integer> maxPriorityMap = new ConcurrentHashMap<>();
+
+    {
+        maxPriorityMap.put("default", 3); // default global max priority
+    }
+
+    public void setMaxPriority(String key, int priority) {
+        maxPriorityMap.put(key, priority);
+    }
+
+    public int getMaxPriority(String key) {
+        return maxPriorityMap.getOrDefault(key, 3);
+    }
+
     //Create a Task
     public TaskEntity createTask(TaskEntity task) {
         int maxPriority = taskRepository.findMaxPriority().orElse(0);
 
-        Integer nextPriority;
-        if (maxPriority == 0) {
-            nextPriority = 1;
-        } else if (maxPriority == 1) {
-            nextPriority = 2;
-        } else if (maxPriority == 2) {
-            nextPriority = 3;
-        } else {
-            nextPriority = null;
-        }
+        Integer next = switch (maxPriority) {
+            case 0 -> 1;
+            case 1 -> 2;
+            case 2 -> 3;
+            default -> null;
+        };
 
-        task.setPriority(nextPriority);
+        task.setPriority(next);
         return taskRepository.save(task);
     }
+
 
     //Read Tasks
     public List<TaskEntity> getAllTasks() {
@@ -62,30 +74,32 @@ public class TaskService {
 
     //Delete Task by ID
     @Transactional
-    public void deleteTaskById(Long id) {
+    public void deleteTaskById(Long id, Integer maxPriority) {
         taskRepository.deleteById(id);
 
         List<TaskEntity> tasks = taskRepository.findAllByOrderByPriorityAsc();
         TaskReorderRequest request = new TaskReorderRequest();
         request.setOrderedIds(tasks.stream().map(TaskEntity::getId).toList());
 
-        reorderTasks(request);
+        reorderTasks(request, maxPriority);
     }
 
-    //Reorder Tasks
     @Transactional
-    public void reorderTasks(TaskReorderRequest request){
-        int priority = 1;
+    public void reorderTasks(TaskReorderRequest request, Integer maxPriority) {
+        if (maxPriority != null) {
+            setMaxPriority("default", maxPriority);
+        }
+        int limit = getMaxPriority("default");
 
-        for(Long id : request.getOrderedIds()){
-            TaskEntity task = taskRepository.findById(id).orElseThrow();
+        int pos = 1;
+        for (Long id : request.getOrderedIds()) {
+            TaskEntity task = taskRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Task not found"));
 
-            if(priority <= 3) {
-                task.setPriority(priority);
-            }else {
-                task.setPriority(null);
-            }
-            priority++;
+            task.setPosition(pos);
+            task.setPriority(pos <= limit ? pos : null);
+            taskRepository.save(task);
+            pos++;
         }
     }
 }

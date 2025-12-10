@@ -34,4 +34,6 @@ public class TaskEntity {
     LocalDateTime updatedAt;
 
     private Long projectId;
+
+    private Integer position;
 }
