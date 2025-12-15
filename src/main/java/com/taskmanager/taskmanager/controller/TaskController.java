@@ -1,12 +1,23 @@
 package com.taskmanager.taskmanager.controller;
 
-import com.taskmanager.taskmanager.dto.TaskReorderRequest;
-import com.taskmanager.taskmanager.entity.TaskEntity;
-import com.taskmanager.taskmanager.service.TaskService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.taskmanager.taskmanager.entity.TaskEntity;
+import com.taskmanager.taskmanager.enums.ImportanceFilter;
+import com.taskmanager.taskmanager.enums.SortDirection;
+import com.taskmanager.taskmanager.service.TaskService;
+
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,12 +47,15 @@ public class TaskController {
     }
 
     @DeleteMapping("/tasks/{id}")
-    public void deleteTask(@PathVariable Long id, @RequestParam(required = false) Integer maxPriority) {
-        taskService.deleteTaskById(id, maxPriority);
+    public void deleteTask(@PathVariable Long id) {
+        taskService.deleteTaskById(id);
     }
 
-    @PostMapping("/tasks/reorder")
-    public void reorderTasks(@RequestBody TaskReorderRequest request) {
-        taskService.reorderTasks(request, request.getMaxPriority());
+    @GetMapping("/tasks/filter")
+    public List<TaskEntity> filterTasks(
+            @RequestParam(defaultValue = "ALL") ImportanceFilter importance,
+            @RequestParam(defaultValue = "ASC") SortDirection sortDir
+    ) {
+        return taskService.getTasksWithFilters(importance, sortDir);
     }
 }

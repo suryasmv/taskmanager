@@ -1,5 +1,12 @@
 package com.taskmanager.taskmanager.service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import com.taskmanager.taskmanager.dto.TaskReorderRequest;
 import com.taskmanager.taskmanager.entity.ProjectEntity;
 import com.taskmanager.taskmanager.entity.TaskEntity;
@@ -7,12 +14,10 @@ import com.taskmanager.taskmanager.exception.ProjectNotFoundException;
 import com.taskmanager.taskmanager.exception.TaskNotFoundException;
 import com.taskmanager.taskmanager.repository.ProjectRepository;
 import com.taskmanager.taskmanager.repository.TaskRepository;
+
 import jakarta.transaction.Transactional;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -66,26 +71,21 @@ public class ProjectService {
         Long projectId = project.getId();
         task.setProjectId(projectId);
 
-        int maxPriority = projectRepository.findMaxPriorityByProjectId(projectId)
-                .orElse(0);   // Optional<Integer> -> int
+        // New project tasks start as normal (not important)
+        task.setIsImportant(false);
 
-        Integer next = switch (maxPriority) {
-            case 0 -> 1;
-            case 1 -> 2;
-            case 2 -> 3;
-            default -> null;
-        };
-
-        task.setPriority(next);
         return taskRepository.save(task);
     }
-
 
     // 2) Get all tasks for a project
     public List<TaskEntity> getTasksForProject(String projectName) {
         ProjectEntity project = getProjectByName(projectName);
-        return taskRepository.findAllByProjectIdOrderByPriorityAsc(project.getId());
+        Long projectId = project.getId();
+
+        // Important tasks first, then normal, both by dueDate DESC
+        return taskRepository.findAllByProjectIdOrderByIsImportantDescDueDateDesc(projectId);
     }
+
 
     // 3) Get one specific task inside a project
     public TaskEntity getTaskInProject(String projectName, Long taskId) {
@@ -102,47 +102,23 @@ public class ProjectService {
     }
 
     @Transactional
-    public void deleteTaskInProject(String projectName, Long taskId, Integer maxPriority) {
+    public void deleteTaskInProject(String projectName, Long taskId) {  // no maxPriority
 
         // 1) Delete the task
         taskRepository.deleteById(taskId);
 
-        // 2) Fetch the project
-        ProjectEntity project = projectRepository.findByName(projectName)
+        // 2) Get project ID
+        Long projectId = projectRepository.findByName(projectName)
+                .map(ProjectEntity::getId)
                 .orElseThrow(() -> new ProjectNotFoundException(projectName));
 
-        Long projectId = project.getId();
+        // 3) Get remaining project tasks
+        List<TaskEntity> remainingTasks = taskRepository
+                .findAllByProjectIdOrderByIsImportantDescDueDateDesc(projectId);  // new query order
 
-        List<TaskEntity> tasks =
-                taskRepository.findAllByProjectIdOrderByPriorityAsc(projectId);
-
-        // 4) Build reorder request
+        // 4) Build reorder request from current DB order
         TaskReorderRequest request = new TaskReorderRequest();
-        request.setOrderedIds(
-                tasks.stream().map(TaskEntity::getId).toList()
-        );
-
-        // 5) Reorder using existing method
-        reorderTasksInProject(projectName, request, maxPriority);
-    }
-
-    // 6) Reorder tasks inside project
-    @Transactional
-    public void reorderTasksInProject(String projectName, TaskReorderRequest request, Integer maxPriority) {
-        if (maxPriority != null) {
-            taskService.setMaxPriority(projectName, maxPriority);
-        }
-        int limit = taskService.getMaxPriority(projectName);
-
-        int pos = 1;
-        for (Long taskId : request.getOrderedIds()) {
-            TaskEntity task = taskRepository.findById(taskId)
-                    .orElseThrow(() -> new TaskNotFoundException("Task not found: " + taskId));
-            // validate project id as before
-            task.setPosition(pos);
-            task.setPriority(pos <= limit ? pos : null);
-            taskRepository.save(task);
-            pos++;
-        }
+        request.setOrderedIds(remainingTasks.stream().map(TaskEntity::getId).toList());
+        request.setSortByDueDate(false);  // preserve natural order after delete
     }
 }

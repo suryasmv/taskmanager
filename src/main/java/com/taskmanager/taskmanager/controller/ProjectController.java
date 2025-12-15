@@ -69,13 +69,7 @@ public class ProjectController {
 
     @DeleteMapping("/{projectName}/tasks/{id}")
     public void deleteTaskInProject(@PathVariable String projectName,
-                                    @PathVariable Long id, @RequestParam(required = false) Integer maxPriority) {
-        projectService.deleteTaskInProject(projectName, id, maxPriority);
-    }
-
-    @PostMapping("/{projectName}/tasks/reorder")
-    public void reorderTasksInProject(@PathVariable String projectName,
-                                      @RequestBody TaskReorderRequest request) {
-        projectService.reorderTasksInProject(projectName, request, request.getMaxPriority());
+                                    @PathVariable Long id) {
+        projectService.deleteTaskInProject(projectName, id);
     }
 }

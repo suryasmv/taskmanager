@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tasks")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @ToString
 public class TaskEntity {
 
     @Id
@@ -25,15 +25,13 @@ public class TaskEntity {
 
     LocalDate dueDate;
 
-    Integer priority = 1;
+    @Column(name = "is_important")
+    Boolean isImportant = false;
 
-    @CreationTimestamp
-    LocalDateTime createdAt;
+    @CreationTimestamp LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    LocalDateTime updatedAt;
+    @UpdateTimestamp LocalDateTime updatedAt;
 
-    private Long projectId;
-
-    private Integer position;
+    Long projectId;
 }
+

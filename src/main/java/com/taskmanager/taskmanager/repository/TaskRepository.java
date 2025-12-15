@@ -1,36 +1,30 @@
 package com.taskmanager.taskmanager.repository;
 
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import com.taskmanager.taskmanager.entity.TaskEntity;
 
-import java.util.List;
-import java.util.Optional;
+import com.taskmanager.taskmanager.entity.TaskEntity;
 
 @Repository
 public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
 
-    //Find Max Priority
-    @Query("select max(t.priority) from TaskEntity t where t.projectId is null")
-    Optional<Integer> findMaxPriority();
-
-    //Find Tasks by Priority
     @Query("""
-           select t
-           from TaskEntity t
-           where t.projectId is null
-           order by case when t.priority is null then 1 else 0 end,
-           t.priority asc
+           SELECT t FROM TaskEntity t
+           WHERE t.projectId IS NULL
+           ORDER BY CASE WHEN t.isImportant = true THEN 0 ELSE 1 END ASC,
+                    t.dueDate ASC
            """)
-    List<TaskEntity> findAllByOrderByPriorityAsc();
+    List<TaskEntity> findAllByProjectIdIsNullOrderByIsImportantAscDueDateAsc();
 
     @Query("""
-           select t
-           from TaskEntity t
-           where t.projectId = :projectId
-           order by case when t.priority is null then 1 else 0 end,
-                    t.priority asc
+           SELECT t FROM TaskEntity t
+           WHERE t.projectId = :projectId
+           ORDER BY CASE WHEN t.isImportant = true THEN 0 ELSE 1 END ASC,
+                    t.dueDate ASC
            """)
-    List<TaskEntity> findAllByProjectIdOrderByPriorityAsc(Long projectId);
+    List<TaskEntity> findAllByProjectIdOrderByIsImportantDescDueDateDesc(@Param("projectId") Long projectId);
 }

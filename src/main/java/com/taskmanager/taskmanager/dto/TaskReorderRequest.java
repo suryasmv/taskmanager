@@ -10,5 +10,5 @@ import java.util.List;
 public class TaskReorderRequest {
 
     private List<Long> orderedIds;
-    private Integer maxPriority;
+    private Boolean sortByDueDate;
 }
