@@ -27,4 +27,6 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
                     t.dueDate ASC
            """)
     List<TaskEntity> findAllByProjectIdOrderByIsImportantDescDueDateDesc(@Param("projectId") Long projectId);
+
+    void deleteByProjectId(Long projectId);
 }

@@ -1,23 +1,17 @@
 package com.taskmanager.taskmanager.service;
 
 import com.taskmanager.taskmanager.dto.TaskReorderRequest;
-import com.taskmanager.taskmanager.entity.ProjectEntity;
 import com.taskmanager.taskmanager.entity.TaskEntity;
 import com.taskmanager.taskmanager.enums.ImportanceFilter;
 import com.taskmanager.taskmanager.enums.SortDirection;
-import com.taskmanager.taskmanager.exception.ProjectNotFoundException;
 import com.taskmanager.taskmanager.exception.TaskNotFoundException;
-import com.taskmanager.taskmanager.repository.ProjectRepository;
 import com.taskmanager.taskmanager.repository.TaskRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -86,7 +80,7 @@ public class TaskService {
                         case ALL           -> true;
                     };
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         // 3) Sort by dueDate ASC / DESC
         Comparator<TaskEntity> cmp = Comparator.comparing(TaskEntity::getDueDate);

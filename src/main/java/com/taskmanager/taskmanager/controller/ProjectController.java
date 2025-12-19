@@ -5,6 +5,7 @@ import com.taskmanager.taskmanager.entity.ProjectEntity;
 import com.taskmanager.taskmanager.entity.TaskEntity;
 import com.taskmanager.taskmanager.service.ProjectService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,6 +36,15 @@ public class ProjectController {
     @GetMapping("/name/{name}")
     public ProjectEntity getProjectByName(@PathVariable String name) {
         return projectService.getProjectByName(name);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> updateProject(
+            @PathVariable Long id,
+            @RequestBody ProjectEntity project
+    ) {
+        projectService.UpdateProject(id, project);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")

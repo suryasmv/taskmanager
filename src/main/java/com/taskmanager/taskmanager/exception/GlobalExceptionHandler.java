@@ -12,8 +12,17 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler
-    public ResponseEntity<Map<String, Object>> handleTaskNotFound(TaskNotFoundException ex){
+    @ExceptionHandler(TaskNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleTaskNotFound(TaskNotFoundException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Not Found");
+        body.put("message", ex.getMessage());
+        body.put("timestamp", LocalDateTime.now().toString());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(ProjectNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleProjectNotFound(ProjectNotFoundException ex) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", "Not Found");
         body.put("message", ex.getMessage());

@@ -58,7 +58,9 @@ public class ProjectService {
     }
 
     //Delete Project
+    @Transactional
     public void deleteProject(Long id) {
+        taskRepository.deleteByProjectId(id);
         projectRepository.deleteById(id);
     }
 
