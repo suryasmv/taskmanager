@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -13,4 +14,8 @@ public interface ProjectRepository extends JpaRepository<ProjectEntity, Long> {
 
     @Query(value = "SELECT * FROM projects p WHERE LOWER(TRIM(p.name)) = LOWER(TRIM(:name)) LIMIT 1", nativeQuery = true)
     Optional<ProjectEntity> findByName(@Param("name") String name);
+
+    List<ProjectEntity> findAllByUserId(Long userId);
+
+    Optional<ProjectEntity> findByNameAndUserId(String name, Long userId);
 }

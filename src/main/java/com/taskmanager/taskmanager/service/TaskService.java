@@ -2,6 +2,7 @@ package com.taskmanager.taskmanager.service;
 
 import com.taskmanager.taskmanager.dto.TaskReorderRequest;
 import com.taskmanager.taskmanager.entity.TaskEntity;
+import com.taskmanager.taskmanager.entity.UserEntity;
 import com.taskmanager.taskmanager.enums.ImportanceFilter;
 import com.taskmanager.taskmanager.enums.SortDirection;
 import com.taskmanager.taskmanager.exception.TaskNotFoundException;
@@ -20,57 +21,75 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
 
-    public TaskEntity createTask(TaskEntity task) {
+    // ---------- CREATE ----------
+
+    public TaskEntity createTaskForUser(TaskEntity task, UserEntity user) {
+        task.setUser(user);
         task.setIsImportant(false); // default false
         return taskRepository.save(task);
     }
 
-    // Read global tasks (no project)
-    public List<TaskEntity> getAllTasks() {
-        return taskRepository.findAllByProjectIdIsNullOrderByIsImportantAscDueDateAsc();
+    // ---------- READ ----------
+
+    // Global tasks (no project) for current user
+    public List<TaskEntity> getAllTasksForUser(UserEntity user) {
+        return taskRepository
+                .findAllByUserIdAndProjectIdIsNullOrderByIsImportantAscDueDateAsc(user.getId());
     }
 
-    //Read Task by ID
-    public TaskEntity getTaskById(Long id) {
-        return taskRepository.findById(id).
-                orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + id));
+    // Helper: load by id and verify ownership
+    public TaskEntity getTaskByIdForUser(Long id, UserEntity user) {
+        TaskEntity task = taskRepository.findById(id)
+                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + id));
+
+        if (!task.getUser().getId().equals(user.getId())) {
+            throw new TaskNotFoundException("Task not found with id: " + id);
+        }
+        return task;
     }
 
-    //update task by ID
+    // ---------- UPDATE ----------
+
     @Transactional
-    public TaskEntity updateTaskById(Long id, TaskEntity task) {
-        TaskEntity existing = getTaskById(id);
+    public TaskEntity updateTaskByIdForUser(Long id, TaskEntity task, UserEntity user) {
+        TaskEntity existing = getTaskByIdForUser(id, user);
 
         existing.setTitle(task.getTitle());
         existing.setDescription(task.getDescription());
         existing.setDueDate(task.getDueDate());
         existing.setStatus(task.getStatus());
-        existing.setIsImportant(task.getIsImportant()); // ← add this
+        existing.setIsImportant(task.getIsImportant());
 
         return taskRepository.save(existing);
     }
 
-    @Transactional
-    public void deleteTaskById(Long id) {  // no maxPriority
-        taskRepository.deleteById(id);
+    // ---------- DELETE ----------
 
-        // Get remaining global tasks (projectId = null) ordered by isImportant + dueDate
+    @Transactional
+    public void deleteTaskByIdForUser(Long id, UserEntity user) {
+        TaskEntity existing = getTaskByIdForUser(id, user);
+        taskRepository.deleteById(existing.getId());
+
+        // Reorder remaining global tasks for this user (projectId = null)
         List<TaskEntity> tasks = taskRepository
-                .findAllByProjectIdIsNullOrderByIsImportantAscDueDateAsc();
+                .findAllByUserIdAndProjectIdIsNullOrderByIsImportantAscDueDateAsc(user.getId());
 
         TaskReorderRequest request = new TaskReorderRequest();
         request.setOrderedIds(tasks.stream().map(TaskEntity::getId).toList());
-        request.setSortByDueDate(false);  // preserve natural order
+        request.setSortByDueDate(false);
     }
 
-    public List<TaskEntity> getTasksWithFilters(
+    // ---------- FILTER (per user) ----------
+
+    public List<TaskEntity> getTasksWithFiltersForUser(
+            UserEntity user,
             ImportanceFilter importance,
             SortDirection sortDirection
     ) {
-        // 1) Load ALL tasks
-        List<TaskEntity> tasks = taskRepository.findAll();
+        // Load tasks for this user (global only)
+        List<TaskEntity> tasks = getAllTasksForUser(user);
 
-        // 2) Filter by importance
+        // Filter by importance
         tasks = tasks.stream()
                 .filter(task -> {
                     boolean imp = Boolean.TRUE.equals(task.getIsImportant());
@@ -82,7 +101,7 @@ public class TaskService {
                 })
                 .toList();
 
-        // 3) Sort by dueDate ASC / DESC
+        // Sort by dueDate ASC / DESC
         Comparator<TaskEntity> cmp = Comparator.comparing(TaskEntity::getDueDate);
         if (sortDirection == SortDirection.DESC) {
             cmp = cmp.reversed();

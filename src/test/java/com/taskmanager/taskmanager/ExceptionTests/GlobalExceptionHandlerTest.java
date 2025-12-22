@@ -1,4 +1,4 @@
-package com.taskmanager.taskmanager.ExceptionTest;
+package com.taskmanager.taskmanager.ExceptionTests;
 
 import com.taskmanager.taskmanager.exception.GlobalExceptionHandler;
 import com.taskmanager.taskmanager.exception.ProjectNotFoundException;

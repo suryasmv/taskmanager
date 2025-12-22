@@ -1,23 +1,16 @@
 package com.taskmanager.taskmanager.controller;
 
-import java.util.List;
-
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.taskmanager.taskmanager.entity.TaskEntity;
+import com.taskmanager.taskmanager.entity.UserEntity;
 import com.taskmanager.taskmanager.enums.ImportanceFilter;
 import com.taskmanager.taskmanager.enums.SortDirection;
 import com.taskmanager.taskmanager.service.TaskService;
-
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -26,36 +19,57 @@ public class TaskController {
 
     private final TaskService taskService;
 
+    private UserEntity getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return (UserEntity) auth.getPrincipal();
+    }
+
+    // ---------- CREATE ----------
+
     @PostMapping("/tasks")
     public TaskEntity createTask(@RequestBody TaskEntity task) {
-        return taskService.createTask(task);
+        UserEntity user = getCurrentUser();
+        return taskService.createTaskForUser(task, user);
     }
+
+    // ---------- READ ----------
 
     @GetMapping("/tasks")
     public List<TaskEntity> getAllTasks() {
-        return taskService.getAllTasks();
+        UserEntity user = getCurrentUser();
+        return taskService.getAllTasksForUser(user);
     }
 
     @GetMapping("/tasks/{id}")
     public TaskEntity getTaskById(@PathVariable Long id) {
-        return taskService.getTaskById(id);
+        UserEntity user = getCurrentUser();
+        return taskService.getTaskByIdForUser(id, user);
     }
+
+    // ---------- UPDATE ----------
 
     @PutMapping("/tasks/{id}")
     public TaskEntity updateTask(@PathVariable Long id, @RequestBody TaskEntity task) {
-        return taskService.updateTaskById(id, task);
+        UserEntity user = getCurrentUser();
+        return taskService.updateTaskByIdForUser(id, task, user);
     }
+
+    // ---------- DELETE ----------
 
     @DeleteMapping("/tasks/{id}")
     public void deleteTask(@PathVariable Long id) {
-        taskService.deleteTaskById(id);
+        UserEntity user = getCurrentUser();
+        taskService.deleteTaskByIdForUser(id, user);
     }
+
+    // ---------- FILTER (per user) ----------
 
     @GetMapping("/tasks/filter")
     public List<TaskEntity> filterTasks(
             @RequestParam(defaultValue = "ALL") ImportanceFilter importance,
             @RequestParam(defaultValue = "ASC") SortDirection sortDir
     ) {
-        return taskService.getTasksWithFilters(importance, sortDir);
+        UserEntity user = getCurrentUser();
+        return taskService.getTasksWithFiltersForUser(user, importance, sortDir);
     }
 }

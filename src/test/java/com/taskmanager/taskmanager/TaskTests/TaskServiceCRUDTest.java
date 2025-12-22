@@ -1,15 +1,13 @@
-package com.taskmanager.taskmanager.TaskServiceTests;
+package com.taskmanager.taskmanager.TaskTests;
 
-import com.taskmanager.taskmanager.dto.TaskReorderRequest;
 import com.taskmanager.taskmanager.entity.TaskEntity;
+import com.taskmanager.taskmanager.entity.UserEntity;
 import com.taskmanager.taskmanager.exception.TaskNotFoundException;
-
 import com.taskmanager.taskmanager.repository.TaskRepository;
 import com.taskmanager.taskmanager.service.TaskService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,7 +17,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,14 +27,20 @@ class TaskServiceCRUDTest {
     private TaskRepository taskRepository;
 
     private TaskService taskService;
+    private UserEntity user;
 
     @BeforeEach
     void setUp() {
         taskService = new TaskService(taskRepository);
+
+        user = new UserEntity();
+        user.setId(1L);
+        user.setFullName("Test User");
+        user.setEmail("test@example.com");
     }
 
     @Test
-    void createTask_shouldSetIsImportantFalseAndSave() {
+    void createTaskForUser_shouldSetUserAndIsImportantFalseAndSave() {
         TaskEntity input = new TaskEntity();
         input.setTitle("Test");
         input.setDescription("Desc");
@@ -46,69 +50,82 @@ class TaskServiceCRUDTest {
         when(taskRepository.save(any(TaskEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskEntity saved = taskService.createTask(input);
+        TaskEntity saved = taskService.createTaskForUser(input, user);
 
         assertThat(saved.getIsImportant()).isFalse();
-        verify(taskRepository).save(any(TaskEntity.class));
+        assertThat(saved.getUser()).isSameAs(user);
+        verify(taskRepository).save(input);
+        verifyNoMoreInteractions(taskRepository);
     }
 
     @Test
-    void getAllTasks_shouldReturnTasksInCorrectOrder() {
-        // Arrange
-        TaskEntity t1 = new TaskEntity(); // important, due tomorrow
-        t1.setIsImportant(true);
-        t1.setDueDate(LocalDate.now().plusDays(1)); //14
-
-        TaskEntity t2 = new TaskEntity(); // important, due today
-        t2.setIsImportant(true);
-        t2.setDueDate(LocalDate.now()); //13
-
-        TaskEntity t3 = new TaskEntity(); // not important, due in 3 days
-        t3.setIsImportant(false);
-        t3.setDueDate(LocalDate.now().plusDays(3)); //16
-
-        TaskEntity t4 = new TaskEntity(); // not important, due yesterday
-        t4.setIsImportant(false);
-        t4.setDueDate(LocalDate.now().minusDays(1)); //12
-
-        List<TaskEntity> tasksFromRepo = List.of(t2,t1,t4,t3);
-
-        when(taskRepository.findAllByProjectIdIsNullOrderByIsImportantAscDueDateAsc())
-                .thenReturn(tasksFromRepo);
-
-        // Act
-        List<TaskEntity> result = taskService.getAllTasks();
-
-        // Assert: repository already returns ordered list, so service must keep that order
-        assertThat(result).containsExactly(t2,t1,t4,t3);
-        verify(taskRepository)
-                .findAllByProjectIdIsNullOrderByIsImportantAscDueDateAsc();
-    }
-
-    @Test
-    void getTaskById_found() {
+    void getAllTasksForUser_shouldUseUserScopedRepositoryMethod() {
         TaskEntity t = new TaskEntity();
         t.setId(1L);
+        t.setTitle("T1");
+        t.setDueDate(LocalDate.now());
+        t.setUser(user);
+
+        when(taskRepository.findAllByUserIdAndProjectIdIsNullOrderByIsImportantAscDueDateAsc(1L))
+                .thenReturn(List.of(t));
+
+        List<TaskEntity> result = taskService.getAllTasksForUser(user);
+
+        assertThat(result).containsExactly(t);
+        verify(taskRepository)
+                .findAllByUserIdAndProjectIdIsNullOrderByIsImportantAscDueDateAsc(1L);
+        verifyNoMoreInteractions(taskRepository);
+    }
+
+    @Test
+    void getTaskByIdForUser_foundAndOwned_returnsTask() {
+        TaskEntity t = new TaskEntity();
+        t.setId(1L);
+        t.setUser(user);
+
         when(taskRepository.findById(1L)).thenReturn(Optional.of(t));
 
-        TaskEntity result = taskService.getTaskById(1L);
+        TaskEntity result = taskService.getTaskByIdForUser(1L, user);
 
         assertThat(result.getId()).isEqualTo(1L);
         verify(taskRepository).findById(1L);
+        verifyNoMoreInteractions(taskRepository);
     }
 
     @Test
-    void getTaskById_notFound_throws() {
+    void getTaskByIdForUser_notFound_throws() {
         when(taskRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> taskService.getTaskById(99L))
+        assertThatThrownBy(() -> taskService.getTaskByIdForUser(99L, user))
                 .isInstanceOf(TaskNotFoundException.class);
+
+        verify(taskRepository).findById(99L);
+        verifyNoMoreInteractions(taskRepository);
     }
 
     @Test
-    void updateTaskById_shouldCopyFieldsAndSave() {
+    void getTaskByIdForUser_ownedByOtherUser_throws() {
+        UserEntity other = new UserEntity();
+        other.setId(2L);
+
+        TaskEntity t = new TaskEntity();
+        t.setId(1L);
+        t.setUser(other);
+
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(t));
+
+        assertThatThrownBy(() -> taskService.getTaskByIdForUser(1L, user))
+                .isInstanceOf(TaskNotFoundException.class);
+
+        verify(taskRepository).findById(1L);
+        verifyNoMoreInteractions(taskRepository);
+    }
+
+    @Test
+    void updateTaskByIdForUser_shouldCopyFieldsAndSave() {
         TaskEntity existing = new TaskEntity();
         existing.setId(1L);
+        existing.setUser(user);
         existing.setTitle("Old");
         existing.setDescription("Old");
         existing.setStatus("PENDING");
@@ -126,30 +143,40 @@ class TaskServiceCRUDTest {
         when(taskRepository.save(any(TaskEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskEntity updated = taskService.updateTaskById(1L, incoming);
+        TaskEntity updated = taskService.updateTaskByIdForUser(1L, incoming, user);
 
         assertThat(updated.getTitle()).isEqualTo("New");
         assertThat(updated.getDescription()).isEqualTo("New Desc");
         assertThat(updated.getStatus()).isEqualTo("IN_PROGRESS");
         assertThat(updated.getDueDate()).isEqualTo(LocalDate.of(2025, 2, 2));
         assertThat(updated.getIsImportant()).isTrue();
+        assertThat(updated.getUser()).isSameAs(user);
 
         verify(taskRepository).findById(1L);
         verify(taskRepository).save(existing);
+        verifyNoMoreInteractions(taskRepository);
     }
 
     @Test
-    void deleteTaskById_shouldReturnCorrectReorderRequest() {
+    void deleteTaskByIdForUser_deletesAndReordersUserTasks() {
+        TaskEntity tExisting = new TaskEntity();
+        tExisting.setId(1L);
+        tExisting.setUser(user);
+
         TaskEntity t2 = new TaskEntity();
         t2.setId(2L);
+        t2.setUser(user);
 
-        when(taskRepository.findAllByProjectIdIsNullOrderByIsImportantAscDueDateAsc())
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(tExisting));
+        when(taskRepository.findAllByUserIdAndProjectIdIsNullOrderByIsImportantAscDueDateAsc(1L))
                 .thenReturn(List.of(t2));
-        doNothing().when(taskRepository).deleteById(1L);
 
-        taskService.deleteTaskById(1L);
+        taskService.deleteTaskByIdForUser(1L, user);
 
+        verify(taskRepository).findById(1L);
         verify(taskRepository).deleteById(1L);
-        verify(taskRepository).findAllByProjectIdIsNullOrderByIsImportantAscDueDateAsc();
+        verify(taskRepository)
+                .findAllByUserIdAndProjectIdIsNullOrderByIsImportantAscDueDateAsc(1L);
+        verifyNoMoreInteractions(taskRepository);
     }
 }
